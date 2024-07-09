@@ -1,0 +1,25 @@
+
+.ant-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 480px;
+  overflow: hidden;
+}
+
+.ant-spin-nested-loading {
+  flex: 1;
+  overflow-y: scroll;
+}
+.zs-play-list-item {
+  word-wrap: none;  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.zs-play-list-item-active {
+  color: #1677ff;
+}
+.ant-list-item-action {
+  margin-inline-start: 8px !important;
+}
