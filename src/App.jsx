@@ -176,6 +176,7 @@ function App() {
       });
       _unsafeWindow.ap4.audio.addEventListener('ended', function () {
         console.log('监听到播放结束');
+        _unsafeWindow.ap4.audio.pause();
         handleStartPlay();
       }, false);
     } catch (err) {
