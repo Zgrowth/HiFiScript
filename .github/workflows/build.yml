@@ -1,0 +1,35 @@
+name: Auto build
+
+on:
+  workflow_dispatch:
+      
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.16.0
+        
+      - name: npm install pnpm
+        run: npm install -g pnpm
+      
+      - name: pnpm install
+        run: pnpm install
+
+      - name: Build
+        run: pnpm run build
+
+      - name: push
+        run: |
+          git add .
+          git commit -m "feat:构建"
+          git push origin master
