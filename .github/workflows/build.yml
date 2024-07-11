@@ -30,7 +30,7 @@ jobs:
 
       - name: push
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
         run: |
           git config --global user.email "18296884762@163.com"
           git config --global user.name "Zgrowth"
