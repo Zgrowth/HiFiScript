@@ -29,9 +29,11 @@ jobs:
         run: pnpm run build
 
       - name: push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.email "18296884762@163.com"
           git config --global user.name "Zgrowth"
           git add .
-          git commit -m "feat:构建"
+          git commit -m "feat: 构建"
           git push origin master
