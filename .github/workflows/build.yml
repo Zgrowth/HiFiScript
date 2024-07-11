@@ -31,4 +31,4 @@ jobs:
           git config --global user.name "Zgrowth"
           git add .
           git commit -m "feat: 构建"
-          git push origin master
+          git push
