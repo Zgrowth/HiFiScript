@@ -22,13 +22,19 @@ jobs:
 
       - name: Build
         run: pnpm run build
-
-      - name: push
+        
+      - name: Set up Git
+        run: |
+          git config --global user.email "18296884762@163.com"
+          git config --global user.name "Zgrowth"
+  
+      - name: Commit changes
+        run: |
+          git add .
+          git commit -m "feat: 构建 by GitHub Actions"
+  
+      - name: Push changes
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
         run: |
-          git config --global user.email "18296884762@163.com"
-          git config --global user.name "zhangsan"
-          git add .
-          git commit -m "feat: 构建"
-          git push origin HEAD:master
+          git push https://x-access-token:${{ secrets.REPO_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git HEAD:master
