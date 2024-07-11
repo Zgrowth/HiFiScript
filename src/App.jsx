@@ -1,16 +1,44 @@
 import { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { FloatButton, Button, List, Modal, Empty, message } from 'antd';
+import { FloatButton, Button, List, Modal, Empty, message, notification } from 'antd';
 import './app.css';
 
-const _unsafeWindow = typeof unsafeWindow != "undefined" ? unsafeWindow  : window;
+const _unsafeWindow = typeof unsafeWindow != "undefined" ? unsafeWindow : window;
 
 function App() {
   const [musicList, setMusicList] = useState(getList());
-  const [curIndex, setCurIndex] = useState(-1);
+  const [curIndex, setCurIndex, getCurIndex] = useStateWithClosure(-1);
   const [orderType, setOrderType] = useState(localStorage.getItem('hifini_play_list2_order_type') || 'order');
   const [visible, setVisible] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+
+  function useStateWithClosure(initialValue) {
+    const [state, setState] = useState(initialValue);
+    const stateRef = useRef(state);
+
+    useEffect(() => {
+      stateRef.current = state;
+    }, [state]);
+
+    const updateState = (newState) => {
+      if (typeof newState === 'function') {
+        setState((prevState) => {
+          const updatedState = newState(prevState);
+          stateRef.current = updatedState;
+          return updatedState;
+        });
+      } else {
+        setState(newState);
+        stateRef.current = newState;
+      }
+    };
+
+    const getState = () => {
+      return stateRef.current;
+    }
+
+    return [state, updateState, getState];
+  }
 
   function getList() {
     const result = [];
@@ -95,17 +123,19 @@ function App() {
     if (!musicList.length) {
       return;
     }
+    const realIndex = getCurIndex();
+    console.log('realIndex:', realIndex);
     // 根据顺序来开始播放
     if (orderType === 'order') {
-      if (curIndex === musicList.length - 1) {
+      if (realIndex === musicList.length - 1) {
         setCurIndex(0);
         location.href = musicList[0].href;
-      } else if (curIndex < 0) {
+      } else if (realIndex < 0) {
         setCurIndex(0);
         location.href = musicList[0].href;
       } else {
-        setCurIndex(curIndex + 1);
-        location.href = musicList[curIndex + 1].href;
+        setCurIndex(realIndex + 1);
+        location.href = musicList[realIndex + 1].href;
       }
     } else {
       const randomIndex = Math.floor(Math.random() * musicList.length);
@@ -173,6 +203,23 @@ function App() {
 
       _unsafeWindow.ap4.audio.play().catch(err => {
         console.log('handleAutoPlay error:', err || err.message);
+        if (err && err.code === 9 && err.name === 'NotSupportedError') {
+          notification.open({
+            message: '温馨提示',
+            type: 'warning',
+            description: '该歌曲未能加载，因为找不到支持的源。即将播放下一首！！',
+            onClose: () => {
+              handleStartPlay();
+            },
+          });
+        } else if (err && err.name === 'NotAllowedError') {
+          notification.open({
+            message: '温馨提示',
+            type: 'warning',
+            description: `由于浏览器策略不同，可能不允许脚本驱动媒体播放，可以手动点击播放音乐按钮，次数多了浏览器会记住你的选择，则脚本驱动媒体播放不会再失败。
+        您也可以手动开启浏览器对声音的设置，将该网站设置为允许播放声音。`,
+          });
+        }
       });
       _unsafeWindow.ap4.audio.addEventListener('ended', function () {
         console.log('监听到播放结束');
@@ -195,7 +242,7 @@ function App() {
     }, inputs);
   }
 
-  useEffect(() => {
+  useFirstUpdate(() => {
     const ele = document.querySelector('#player4');
     if (ele) {
       console.log('到达了播放页面');
