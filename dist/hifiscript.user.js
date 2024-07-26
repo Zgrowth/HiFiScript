@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hifini音乐播放管理
 // @namespace    http://tampermonkey.net/
-// @version      1.0.2
+// @version      1.0.3
 // @author       zs
 // @description  在HiFiNi网站自动播放歌曲，可以自定义播放列表
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=hifini.com
@@ -13,7 +13,7 @@
 // @grant        unsafeWindow
 // ==/UserScript==
 
-(e=>{if(typeof GM_addStyle=="function"){GM_addStyle(e);return}const t=document.createElement("style");t.textContent=e,document.head.append(t)})(" .ant-list{display:flex;flex-direction:column;max-height:480px;overflow:hidden}.ant-spin-nested-loading{flex:1;overflow-y:scroll}.zs-play-list-item{word-wrap:none;word-break:break-all;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}.zs-play-list-item-active{color:#1677ff}.ant-list-item-action{margin-inline-start:8px!important} ");
+(e=>{if(typeof GM_addStyle=="function"){GM_addStyle(e);return}const t=document.createElement("style");t.textContent=e,document.head.append(t)})(" .ant-list{display:flex;flex-direction:column;max-height:500px;overflow:hidden}.ant-spin-nested-loading{flex:1;overflow-y:scroll}.zs-play-list-item{word-wrap:none;word-break:break-all;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}.zs-play-list-item-active{color:#1677ff}.ant-list-item-action{margin-inline-start:8px!important} ");
 
 (function (require$$0, require$$0$1, antd) {
   'use strict';
@@ -55,11 +55,31 @@
   }
   const _unsafeWindow = typeof unsafeWindow != "undefined" ? unsafeWindow : window;
   function App() {
-    const [musicList, setMusicList] = require$$0.useState(getList());
+    const [musicList, setMusicList, getMusicList] = useStateWithClosure(getList());
+    const [songSheetList, setSongSheetList, getSongSheetList] = useLocalStorage("hifini_song_sheet_list", []);
     const [curIndex, setCurIndex, getCurIndex] = useStateWithClosure(-1);
-    const [orderType, setOrderType] = require$$0.useState(localStorage.getItem("hifini_play_list2_order_type") || "order");
+    const [orderType, setOrderType] = useLocalStorage("hifini_play_list2_order_type", "order");
+    const [sheetValue, setSheetValue] = require$$0.useState("");
+    const [sheetMusicValue, setSheetMusicValue] = require$$0.useState([]);
+    const [isInSheet, setIsInSheet] = require$$0.useState(false);
+    const [curSheetName, setCurSheetName, getCurSheetName] = useStateWithClosure("");
+    const [curSheetMusic, setCurSheetMusic] = require$$0.useState([]);
+    const [curPlaySheet, setCurPlaySheet, getCurPlaySheet] = useLocalStorage("hifini_save_play_sheet_name", "");
+    const [saveSheetMusic, setSaveSheetMusic, getSaveSheetMusic] = useLocalStorage("hifini_save_play_sheet_list", []);
     const [visible, setVisible] = require$$0.useState(false);
+    const [addSheetVisible, setAddSheetVisible] = require$$0.useState(false);
     const [messageApi, contextHolder] = antd.message.useMessage();
+    const realSheetCurIndex = require$$0.useMemo(() => {
+      let index = -1;
+      const result = saveSheetMusic;
+      if (location.pathname !== "/") {
+        index = result.findIndex((i) => (i.href || "").includes(location.pathname));
+      }
+      if (curSheetName !== curPlaySheet) {
+        index = -1;
+      }
+      return index;
+    }, [curSheetName, curPlaySheet, saveSheetMusic]);
     function useStateWithClosure(initialValue) {
       const [state, setState] = require$$0.useState(initialValue);
       const stateRef = require$$0.useRef(state);
@@ -83,6 +103,36 @@
       };
       return [state, updateState, getState];
     }
+    function useLocalStorage(key, initialValue) {
+      const [storedValue, setStoredValue] = require$$0.useState(() => {
+        try {
+          const item = window.localStorage.getItem(key);
+          return item ? JSON.parse(item) : initialValue;
+        } catch (error) {
+          console.error(error);
+          return initialValue;
+        }
+      });
+      const setValue = require$$0.useCallback((value) => {
+        try {
+          const valueToStore = value instanceof Function ? value(storedValue) : value;
+          setStoredValue(valueToStore);
+          window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        } catch (error) {
+          console.error(error);
+        }
+      }, [key, storedValue]);
+      const getValue = require$$0.useCallback(() => {
+        try {
+          const item = window.localStorage.getItem(key);
+          return item ? JSON.parse(item) : initialValue;
+        } catch (error) {
+          console.error(error);
+          return initialValue;
+        }
+      }, [key, initialValue]);
+      return [storedValue, setValue, getValue];
+    }
     function getList() {
       const result = [];
       try {
@@ -91,6 +141,28 @@
         return result;
       }
       return result;
+    }
+    function addSongSheet() {
+      try {
+        if (!sheetValue) {
+          antd.message.error("歌单名称不能为空");
+          return;
+        }
+        const sheetList = songSheetList;
+        if (sheetList.find((i) => i.name === sheetValue)) {
+          antd.message.error("歌单已存在");
+          return;
+        }
+        sheetList.push({ name: sheetValue, children: sheetMusicValue });
+        setSongSheetList(sheetList);
+        setSheetValue("");
+        setSheetMusicValue([]);
+        setAddSheetVisible(false);
+        insertOperatorBtn(true);
+        antd.message.success("添加歌单成功");
+      } catch (err) {
+        antd.message.error("添加歌单失败");
+      }
     }
     function addItemPlayList(data = {}) {
       const result = getList() || [];
@@ -129,28 +201,30 @@
         ulEle.forEach((it) => {
           const mediaEle = getNodeByClassName(it.children, "media-body");
           const subjectEle = getNodeByClassName(mediaEle.children, "subject");
-          subjectEle.setAttribute("data-href", subjectEle.children[0].href);
-          subjectEle.setAttribute("data-name", subjectEle.children[0].innerText);
-          createRoot(subjectEle).render(
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center" }, children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { dangerouslySetInnerHTML: { __html: subjectEle.innerHTML } }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                antd.Button,
-                {
-                  style: { marginLeft: 8 },
-                  type: "primary",
-                  size: "small",
-                  onClick: () => {
-                    console.log("_unsafeWindow:", _unsafeWindow);
-                    const href = subjectEle.dataset.href;
-                    const name = subjectEle.dataset.name;
-                    addItemPlayList({ href, name });
-                  },
-                  children: "添加到播放列表"
-                }
-              )
-            ] })
-          );
+          if (subjectEle.children[0].innerText.includes("mp3") || subjectEle.children[0].innerText.includes("MP3")) {
+            subjectEle.setAttribute("data-href", subjectEle.children[0].href);
+            subjectEle.setAttribute("data-name", subjectEle.children[0].innerText);
+            createRoot(subjectEle).render(
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center" }, children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { dangerouslySetInnerHTML: { __html: subjectEle.innerHTML } }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  antd.Button,
+                  {
+                    style: { marginLeft: 8 },
+                    type: "primary",
+                    size: "small",
+                    onClick: () => {
+                      console.log("_unsafeWindow:", _unsafeWindow);
+                      const href = subjectEle.dataset.href;
+                      const name = subjectEle.dataset.name;
+                      addItemPlayList({ href, name });
+                    },
+                    children: "添加到播放列表"
+                  }
+                )
+              ] })
+            );
+          }
         });
       } catch (error) {
         console.log("插入'添加到播放列表'按钮失败:", error);
@@ -158,32 +232,46 @@
       }
     }
     function handleStartPlay() {
-      if (!musicList.length) {
+      const sheetList = getSaveSheetMusic();
+      const realMusicList = sheetList.length ? sheetList : getMusicList();
+      if (!realMusicList.length) {
         return;
       }
-      const realIndex = getCurIndex();
+      const realIndex = sheetList.length ? getSheetCurIndex() : getCurIndex();
       console.log("realIndex:", realIndex);
       if (orderType === "order") {
-        if (realIndex === musicList.length - 1) {
+        if (realIndex === realMusicList.length - 1) {
           setCurIndex(0);
-          location.href = musicList[0].href;
+          location.href = realMusicList[0].href;
         } else if (realIndex < 0) {
           setCurIndex(0);
-          location.href = musicList[0].href;
+          location.href = realMusicList[0].href;
         } else {
           setCurIndex(realIndex + 1);
-          location.href = musicList[realIndex + 1].href;
+          location.href = realMusicList[realIndex + 1].href;
         }
       } else {
-        const randomIndex = Math.floor(Math.random() * musicList.length);
+        const randomIndex = Math.floor(Math.random() * realMusicList.length);
         console.log("随机到索引:", randomIndex);
         setCurIndex(randomIndex);
-        location.href = musicList[randomIndex].href;
+        location.href = realMusicList[randomIndex].href;
       }
     }
-    function insertOperatorBtn() {
-      console.log("insertOperatorBtn start");
+    function getSheetCurIndex() {
+      let index = -1;
+      const result = getSaveSheetMusic();
+      if (location.pathname !== "/") {
+        index = result.findIndex((i) => (i.href || "").includes(location.pathname));
+      }
+      return index;
+    }
+    function insertOperatorBtn(flag) {
+      var _a;
       try {
+        if (flag) {
+          const ele2 = document.querySelector(".zs-play-list-item-operator");
+          ele2.parentElement.removeChild(ele2);
+        }
         const ele = document.querySelector("#player4 .aplayer-music");
         if (ele.innerHTML.includes("zs-play-list-item-operator")) return;
         createRoot(ele).render(
@@ -224,7 +312,34 @@
                   },
                   children: "添加到播放列表"
                 }
-              )
+              ),
+              ((_a = getSongSheetList()) == null ? void 0 : _a.length) ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+                antd.Dropdown,
+                {
+                  menu: {
+                    items: getSongSheetList().map((it) => {
+                      return { key: it.name, label: `【${it.name}】` };
+                    }),
+                    onClick: ({ key }) => {
+                      const href = location.href;
+                      const name = document.querySelector(".media-body h4").innerText;
+                      handleAddSongToSheet(key, { href, name });
+                    }
+                  },
+                  placement: "bottomLeft",
+                  arrow: true,
+                  trigger: ["click"],
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    antd.Button,
+                    {
+                      style: { marginLeft: 8 },
+                      type: "primary",
+                      size: "small",
+                      children: "添加到歌单"
+                    }
+                  )
+                }
+              ) : null
             ] })
           ] })
         );
@@ -270,6 +385,156 @@
         handleAutoPlay();
       }
     }
+    function handleAddSongSheet() {
+      setAddSheetVisible(true);
+    }
+    function handleDelSheetMusic(item, index) {
+      const realList = getSongSheetList();
+      const sheetItem = realList.find((i) => i.name === curSheetName);
+      sheetItem.children = sheetItem.children.filter((i) => i.value !== item.href);
+      if (curSheetName === curPlaySheet) {
+        setSaveSheetMusic((pre) => {
+          return pre.filter((i) => i.name !== item.name);
+        });
+      }
+      setCurSheetMusic((pre) => {
+        return pre.filter((i) => i.name !== item.name);
+      });
+      console.log("realList:", realList);
+      setSongSheetList(realList);
+    }
+    function renderListItem(item, index) {
+      if (curSheetName) {
+        return renderListItemInside(item, index);
+      }
+      return renderListItemOutside(item);
+    }
+    function renderListItemInside(item, index) {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx(
+        antd.List.Item,
+        {
+          actions: [/* @__PURE__ */ jsxRuntimeExports.jsx(
+            antd.Button,
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                handleDelSheetMusic(item);
+              },
+              size: "small",
+              type: "link",
+              danger: true,
+              children: "删除"
+            }
+          )],
+          styles: {
+            padding: "0px 10px"
+          },
+          onClick: () => {
+            setCurPlaySheet(curSheetName);
+            setSaveSheetMusic(curSheetMusic);
+            location.href = item.href;
+          },
+          children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: realSheetCurIndex === index ? "zs-play-list-item zs-play-list-item-active" : "zs-play-list-item", children: item.name })
+        }
+      );
+    }
+    function renderListItemOutside(item, index) {
+      var _a;
+      return /* @__PURE__ */ jsxRuntimeExports.jsx(
+        antd.List.Item,
+        {
+          actions: [/* @__PURE__ */ jsxRuntimeExports.jsx(
+            antd.Button,
+            {
+              onClick: (e) => {
+                var _a2, _b;
+                e.stopPropagation();
+                const href = (_b = (_a2 = item == null ? void 0 : item.children) == null ? void 0 : _a2[0]) == null ? void 0 : _b.value;
+                if (href) {
+                  location.href = href;
+                  setCurPlaySheet(item.name);
+                  setSaveSheetMusic((item.children || []).map((it) => {
+                    return {
+                      name: it.label,
+                      href: it.value
+                    };
+                  }));
+                } else {
+                  antd.message.error("歌单内歌曲为空");
+                }
+              },
+              size: "small",
+              type: "link",
+              children: "播放"
+            }
+          ), /* @__PURE__ */ jsxRuntimeExports.jsx(
+            antd.Button,
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                if (item.name === curPlaySheet) {
+                  setCurPlaySheet("");
+                  setSaveSheetMusic([]);
+                }
+                setSongSheetList(songSheetList.filter((i) => i.name !== item.name));
+                setTimeout(() => {
+                  insertOperatorBtn(true);
+                }, 100);
+              },
+              size: "small",
+              type: "link",
+              danger: true,
+              children: "删除"
+            }
+          )],
+          styles: {
+            padding: "0px 10px"
+          },
+          onClick: () => {
+            setCurSheetName(item.name);
+            setCurSheetMusic((item.children || []).map((it) => {
+              return {
+                name: it.label,
+                href: it.value
+              };
+            }));
+          },
+          children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: curPlaySheet === item.name ? "zs-play-list-item zs-play-list-item-active" : "zs-play-list-item", children: [
+            item.name,
+            "（",
+            ((_a = item == null ? void 0 : item.children) == null ? void 0 : _a.length) || 0,
+            "）"
+          ] })
+        }
+      );
+    }
+    function handleAddSongToSheet(sheetName, data = {}) {
+      const realList = getSongSheetList();
+      const sheetItem = realList.find((i) => i.name === sheetName);
+      if (sheetItem.children.find((i) => i.value === data.href)) {
+        antd.message.error("歌单已存在该歌曲");
+        return;
+      }
+      sheetItem.children.push({
+        label: data.name,
+        value: data.href
+      });
+      if (getCurSheetName() === sheetName) {
+        setCurSheetMusic((pre) => {
+          const result = pre.concat([data]);
+          return result;
+        });
+      }
+      if (getCurPlaySheet() === sheetName) {
+        setSaveSheetMusic((pre) => {
+          const result = pre.concat([data]);
+          return result;
+        });
+      }
+      console.log("realList:", realList);
+      setSongSheetList(realList);
+      antd.message.success("添加歌曲成功");
+    }
     function useFirstUpdate(fn, inputs) {
       const countRef = require$$0.useRef(0);
       require$$0.useEffect(() => {
@@ -287,30 +552,68 @@
       }
     }, []);
     require$$0.useEffect(() => {
-      const result = getList();
-      if (location.pathname !== "/") {
-        const index = result.findIndex((i) => (i.href || "").includes(location.pathname));
-        setCurIndex(index);
+      if (!saveSheetMusic.length) {
+        const result = getList();
+        if (location.pathname !== "/") {
+          const index = result.findIndex((i) => (i.href || "").includes(location.pathname));
+          setCurIndex(index);
+        }
+      } else {
+        setCurIndex(-1);
       }
-    }, [musicList]);
+    }, [musicList, saveSheetMusic]);
     useFirstUpdate(() => {
       setInsertAddList();
     }, []);
     require$$0.useEffect(() => {
-      localStorage.setItem("hifini_play_list2_order_type", orderType || "order");
-    }, [orderType]);
+      if (curPlaySheet) {
+        setIsInSheet(true);
+        setCurSheetName(curPlaySheet);
+        setCurSheetMusic(saveSheetMusic);
+      }
+    }, []);
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "App", children: [
       contextHolder,
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         antd.Modal,
         {
-          title: "播放列表",
+          title: isInSheet ? "歌单管理" : "播放列表",
           open: visible,
           footer: null,
           width: 640,
           maskClosable: false,
           onCancel: () => setVisible(false),
-          children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+          children: isInSheet ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+            antd.List,
+            {
+              style: { border: "1px solid #f5f5f5" },
+              itemLayout: "horizontal",
+              size: "small",
+              dataSource: curSheetName ? curSheetMusic : songSheetList,
+              locale: {
+                emptyText: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  antd.Empty,
+                  {
+                    description: curSheetName ? "暂无歌曲，请先添加歌曲到歌单" : "暂无歌单，请先新建",
+                    image: antd.Empty.PRESENTED_IMAGE_SIMPLE
+                  }
+                ) })
+              },
+              renderItem: renderListItem,
+              header: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: "0 16px" }, children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => handleAddSongSheet(), type: "primary", size: "small", children: "新建歌单" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => {
+                  setCurSheetName("");
+                  setIsInSheet(false);
+                }, style: { marginLeft: 8 }, size: "small", children: "返回播放列表" }),
+                curSheetName ? /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setCurSheetName(""), style: { marginLeft: 8 }, size: "small", children: "返回歌单列表" }) : null,
+                curPlaySheet ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "inline-flex", marginLeft: 16, color: "#666" }, children: [
+                  "当前播放歌单：",
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { color: "#333", fontWeight: 500 }, children: curPlaySheet })
+                ] }) : null
+              ] })
+            }
+          ) : /* @__PURE__ */ jsxRuntimeExports.jsx(
             antd.List,
             {
               style: { border: "1px solid #f5f5f5" },
@@ -338,17 +641,69 @@
                   },
                   onClick: () => {
                     location.href = item.href;
+                    setCurPlaySheet("");
+                    setSaveSheetMusic([]);
                   },
                   children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: curIndex === index ? "zs-play-list-item zs-play-list-item-active" : "zs-play-list-item", children: item.name })
                 }
               ),
               header: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: "0 16px" }, children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => handleStartPlay(), type: "primary", size: "small", children: "开始播放" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => {
+                  setCurPlaySheet("");
+                  setSaveSheetMusic([]);
+                  handleStartPlay();
+                }, type: "primary", size: "small", children: "开始播放" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setOrderType(orderType === "order" ? "random" : "order"), style: { marginLeft: 8 }, size: "small", children: orderType === "order" ? "随机播放" : "顺序播放" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setListAll([]), style: { marginLeft: 8 }, size: "small", children: "清空列表" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setListAll([]), style: { marginLeft: 8 }, size: "small", children: "清空列表" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setIsInSheet(true), style: { marginLeft: 8 }, size: "small", children: "歌单管理" })
               ] })
             }
           )
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        antd.Modal,
+        {
+          title: "新建歌单",
+          open: addSheetVisible,
+          width: 340,
+          maskClosable: false,
+          onOk: () => {
+            addSongSheet();
+          },
+          okText: "确定",
+          cancelText: "取消",
+          centered: true,
+          onClose: () => setAddSheetVisible(false),
+          onCancel: () => setAddSheetVisible(false),
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              antd.Input,
+              {
+                allowClear: true,
+                maxLength: 20,
+                style: { width: "100%" },
+                placeholder: "请输入歌单名称",
+                value: sheetValue,
+                onChange: (e) => setSheetValue(e.target.value)
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              antd.Select,
+              {
+                mode: "multiple",
+                allowClear: true,
+                style: { width: "100%", marginTop: 16 },
+                placeholder: "可从播放列表选择歌曲到歌单",
+                value: sheetMusicValue,
+                onChange: (v) => setSheetMusicValue(v),
+                labelInValue: true,
+                optionFilterProp: "name",
+                fieldNames: { label: "name", value: "href" },
+                options: musicList
+              }
+            )
+          ]
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
