@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'hifini音乐播放管理',
         namespace: 'http://tampermonkey.net/',
         description: '在HiFiNi网站自动播放歌曲，可以自定义播放列表',
-        match: ['https://www.hifini.com/*'],
+        match: ['https://www.hifini.com/*', 'https://hifini.com/*'],
         author: 'zs',
         version: '1.0.3',
         require: [
