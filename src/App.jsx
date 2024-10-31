@@ -514,6 +514,79 @@ function App() {
     message.success('添加歌曲成功');
   }
 
+  // 导出
+  function handleExportAll() {
+    exportToJsonFile({
+      list: getMusicList(),
+      sheetList: getSongSheetList()
+    });
+  }
+
+  // 导入
+  function handleImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.click();
+
+    input.onchange = function (event) {
+      const file = event.target.files[0];
+
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = function (e) {
+        const contents = e.target.result;
+
+        try {
+          const data = JSON.parse(contents);
+          console.log('Imported Data:', data);
+          // 在这里处理导入的数据
+          if (data.list) {
+            localStorage.setItem('hifini_play_list', JSON.stringify(data.list));
+          }
+          if (data.sheetList) {
+            setSongSheetList(data.sheetList);
+          }
+          message.success('导入完成，即将刷新页面！');
+          setTimeout(() => {
+            location.reload();
+          }, 1000);
+        } catch (error) {
+          console.error('Error parsing JSON:', error);
+        }
+      };
+
+      reader.readAsText(file);
+    };
+  }
+
+  function exportToJsonFile(data) {
+    // 序列化 JSON 数据
+    const jsonString = JSON.stringify(data, null, 2);
+
+    // 创建 Blob 对象
+    const blob = new Blob([jsonString], { type: 'application/json' });
+
+    // 创建 URL
+    const url = window.URL.createObjectURL(blob);
+
+    // 创建隐藏的可下载链接
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hifini导出.json'; // 设置文件名
+    a.click(); // 触发点击事件
+
+    // 清理
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url); // 释放 URL 对象
+      a.remove(); // 移除元素
+    }, 0);
+  }
+
   function useFirstUpdate(fn, inputs) {
     const countRef = useRef(0);
     useEffect(() => {
@@ -660,6 +733,12 @@ function App() {
                 </Button>
                 <Button onClick={() => setIsInSheet(true)} style={{ marginLeft: 8 }} size='small'>
                   歌单管理
+                </Button>
+                <Button onClick={() => handleExportAll()} style={{ marginLeft: 8 }} size='small'>
+                  导出全部
+                </Button>
+                <Button onClick={() => handleImport()} style={{ marginLeft: 8 }} size='small'>
+                  导入
                 </Button>
               </div>}
             />
