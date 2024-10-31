@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hifini音乐播放管理
 // @namespace    http://tampermonkey.net/
-// @version      1.0.3
+// @version      1.0.4
 // @author       zs
 // @description  在HiFiNi网站自动播放歌曲，可以自定义播放列表
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=hifini.com
