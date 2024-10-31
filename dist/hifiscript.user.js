@@ -6,6 +6,7 @@
 // @description  在HiFiNi网站自动播放歌曲，可以自定义播放列表
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=hifini.com
 // @match        https://www.hifini.com/*
+// @match        https://hifini.com/*
 // @require      https://cdn.jsdelivr.net/npm/dayjs@1.11.11/dayjs.min.js
 // @require      https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js
 // @require      https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js
@@ -535,6 +536,58 @@
       setSongSheetList(realList);
       antd.message.success("添加歌曲成功");
     }
+    function handleExportAll() {
+      exportToJsonFile({
+        list: getMusicList(),
+        sheetList: getSongSheetList()
+      });
+    }
+    function handleImport() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json";
+      input.click();
+      input.onchange = function(event) {
+        const file = event.target.files[0];
+        if (!file) {
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const contents = e.target.result;
+          try {
+            const data = JSON.parse(contents);
+            console.log("Imported Data:", data);
+            if (data.list) {
+              localStorage.setItem("hifini_play_list", JSON.stringify(data.list));
+            }
+            if (data.sheetList) {
+              setSongSheetList(data.sheetList);
+            }
+            antd.message.success("导入完成，即将刷新页面！");
+            setTimeout(() => {
+              location.reload();
+            }, 1e3);
+          } catch (error) {
+            console.error("Error parsing JSON:", error);
+          }
+        };
+        reader.readAsText(file);
+      };
+    }
+    function exportToJsonFile(data) {
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "hifini导出.json";
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      }, 0);
+    }
     function useFirstUpdate(fn, inputs) {
       const countRef = require$$0.useRef(0);
       require$$0.useEffect(() => {
@@ -655,7 +708,9 @@
                 }, type: "primary", size: "small", children: "开始播放" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setOrderType(orderType === "order" ? "random" : "order"), style: { marginLeft: 8 }, size: "small", children: orderType === "order" ? "随机播放" : "顺序播放" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setListAll([]), style: { marginLeft: 8 }, size: "small", children: "清空列表" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setIsInSheet(true), style: { marginLeft: 8 }, size: "small", children: "歌单管理" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => setIsInSheet(true), style: { marginLeft: 8 }, size: "small", children: "歌单管理" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => handleExportAll(), style: { marginLeft: 8 }, size: "small", children: "导出全部" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => handleImport(), style: { marginLeft: 8 }, size: "small", children: "导入" })
               ] })
             }
           )
