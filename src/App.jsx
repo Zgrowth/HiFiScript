@@ -266,7 +266,7 @@ function App() {
               type='primary'
               size='small'
               onClick={() => {
-                window.open(ap4.audio.src, '_blank');
+                window.open(getAuditObject().audio.src, '_blank');
               }}
             >
               下载
@@ -326,18 +326,27 @@ function App() {
     }
   }
 
+  function getAuditObject() {
+    try {
+      return ap4;
+    } catch (error) {
+      return ap;
+    }
+  }
+
   // 到达音乐播放页自动播放
   async function handleAutoPlay() {
     console.log('handleAutoPlay', _unsafeWindow);
     try {
-      while (!_unsafeWindow.ap4) {
+      const realAp = getAuditObject();
+      while (!realAp) {
         console.log('window.ap4 is not available, retrying...');
         await new Promise(resolve => setTimeout(resolve, 1200));
       }
       // 插入下载、下一首、添加到播放列表按钮
       insertOperatorBtn();
 
-      _unsafeWindow.ap4.audio.play().catch(err => {
+      realAp.audio.play().catch(err => {
         console.log('handleAutoPlay error:', err || err.message);
         if (err && err.code === 9 && err.name === 'NotSupportedError') {
           notification.open({
@@ -357,9 +366,9 @@ function App() {
           });
         }
       });
-      _unsafeWindow.ap4.audio.addEventListener('ended', function () {
+      realAp.audio.addEventListener('ended', function () {
         console.log('监听到播放结束');
-        _unsafeWindow.ap4.audio.pause();
+        realAp.audio.pause();
         handleStartPlay();
       }, false);
     } catch (err) {
