@@ -4,7 +4,11 @@
 
 ## 如何使用
 
-本脚本是[tampermonkey](https://www.tampermonkey.net/index.php?version=4.14&ext=dhdg&show=dhdg)浏览器脚本，安装tampermonkey请自行百度
+1. 本脚本是[tampermonkey](https://www.tampermonkey.net/index.php?version=4.14&ext=dhdg&show=dhdg)浏览器脚本，安装tampermonkey请自行百度  
+2. tampermonkey安装完成后可在[openuserjs](https://openuserjs.org/scripts/zgrowth/hifiti%E9%9F%B3%E4%B9%90%E6%92%AD%E6%94%BE%E7%AE%A1%E7%90%86)搜索已发布的脚本进行安装。
+3. 安装完成后可以在[HIFINI](https://www.hifiti.com/)音乐列表添加音乐到播放列表。
+
+
 
 ### 示例
 
