@@ -20,6 +20,7 @@ export default defineConfig({
           'https://cdn.jsdelivr.net/npm/dayjs@1.11.11/dayjs.min.js'
         ],
         grant: ['unsafeWindow'],
+        license: 'https://github.com/Zgrowth/HiFiScript/blob/master/LICENSE'
       },
       build: {
         externalGlobals: {
