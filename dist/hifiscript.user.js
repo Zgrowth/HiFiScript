@@ -4,6 +4,7 @@
 // @version      2.0.0
 // @author       zgrowth
 // @description  在HiFiNi网站自动播放歌曲，可以自定义播放列表
+// @license      https://github.com/Zgrowth/HiFiScript/blob/master/LICENSE
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=hifiti.com
 // @match        https://www.hifiti.com/*
 // @match        https://hifiti.com/*
