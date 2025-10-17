@@ -207,7 +207,7 @@ function App() {
       })
     } catch (error) {
       console.log("插入'添加到播放列表'按钮失败:", error);
-      alert("插入'添加到播放列表'按钮失败");
+      // alert("插入'添加到播放列表'按钮失败");
     }
   }
 
