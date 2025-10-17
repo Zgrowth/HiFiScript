@@ -202,9 +202,10 @@
         ulEle.forEach((it) => {
           const mediaEle = getNodeByClassName(it.children, "media-body");
           const subjectEle = getNodeByClassName(mediaEle.children, "subject");
-          if (subjectEle.children[0].innerText.includes("mp3") || subjectEle.children[0].innerText.includes("MP3")) {
+          const title = subjectEle.children[0].innerText;
+          if (title.includes("mp3") || title.includes("MP3") || /《\s*(.*?)\s*》/g.test(title)) {
             subjectEle.setAttribute("data-href", subjectEle.children[0].href);
-            subjectEle.setAttribute("data-name", subjectEle.children[0].innerText);
+            subjectEle.setAttribute("data-name", title);
             createRoot(subjectEle).render(
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center" }, children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("div", { dangerouslySetInnerHTML: { __html: subjectEle.innerHTML } }),
