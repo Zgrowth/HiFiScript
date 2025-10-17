@@ -1,5 +1,9 @@
 name: Auto build
 
+# 允许写权限以便用 GITHUB_TOKEN 推送
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
 
@@ -8,37 +12,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           # 允许使用 runner 上的凭据（GITHUB_TOKEN）来 push
           persist-credentials: true
           fetch-depth: 0
-      
+
       - uses: actions/setup-node@v3
         with:
           node-version: 18.16.0
-        
+
       - name: npm install pnpm
         run: npm install -g pnpm
-      
+
       - name: pnpm install
         run: pnpm install
 
       - name: Build
         run: pnpm run build
-        
-      - name: Set up Git
+
+      - name: Set up Git user
         run: |
           git config --global user.email "18296884762@163.com"
           git config --global user.name "Zgrowth"
-  
-      - name: Commit changes
+
+      - name: Commit changes if any
         run: |
           git add .
-          git commit -m "feat: 构建 by GitHub Actions"
-  
+          # 仅当有 staged 更改时才提交，避免失败
+          git diff --cached --quiet || git commit -m "feat: 构建 by GitHub Actions"
+
       - name: Push changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
+        # 使用 checkout 时已设置好凭据（GITHUB_TOKEN），直接 push 即可
         run: |
-          git push https://x-access-token:${{ secrets.REPO_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git HEAD:master
+          # 将变更推送回触发分支（如果是 default branch，会正确推送到它）
+          git push origin HEAD:refs/heads/${{ github.ref_name }}
