@@ -9,13 +9,13 @@ export default defineConfig({
     monkey({
       entry: 'src/main.jsx',
       userscript: {
-        icon: 'https://www.google.com/s2/favicons?sz=64&domain=hifini.com',
-        name: 'hifini音乐播放管理',
+        icon: 'https://www.google.com/s2/favicons?sz=64&domain=hifiti.com',
+        name: 'hifiti音乐播放管理',
         namespace: 'http://tampermonkey.net/',
         description: '在HiFiNi网站自动播放歌曲，可以自定义播放列表',
-        match: ['https://www.hifini.com/*', 'https://hifini.com/*'],
-        author: 'zs',
-        version: '1.0.4',
+        match: ['https://www.hifiti.com/*', 'https://hifiti.com/*'],
+        author: 'zgrowth',
+        version: '2.0.0',
         require: [
           'https://cdn.jsdelivr.net/npm/dayjs@1.11.11/dayjs.min.js'
         ],

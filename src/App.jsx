@@ -12,16 +12,16 @@ const _unsafeWindow = typeof unsafeWindow != "undefined" ? unsafeWindow : window
 
 function App() {
   const [musicList, setMusicList, getMusicList] = useStateWithClosure(getList());
-  const [songSheetList, setSongSheetList, getSongSheetList] = useLocalStorage('hifini_song_sheet_list', []); // 歌单数据源
+  const [songSheetList, setSongSheetList, getSongSheetList] = useLocalStorage('hifiti_song_sheet_list', []); // 歌单数据源
   const [curIndex, setCurIndex, getCurIndex] = useStateWithClosure(-1);
-  const [orderType, setOrderType] = useLocalStorage('hifini_play_list2_order_type', 'order');
+  const [orderType, setOrderType] = useLocalStorage('hifiti_play_list2_order_type', 'order');
   const [sheetValue, setSheetValue] = useState(''); // 新建歌单的歌单名称
   const [sheetMusicValue, setSheetMusicValue] = useState([]); // 新建歌单选择的歌曲
   const [isInSheet, setIsInSheet] = useState(false); // 是否在歌单管理界面
   const [curSheetName, setCurSheetName, getCurSheetName] = useStateWithClosure(''); // 当前进入的歌单名称
   const [curSheetMusic, setCurSheetMusic] = useState([]); // 当前进入的歌单歌曲列表
-  const [curPlaySheet, setCurPlaySheet, getCurPlaySheet] = useLocalStorage('hifini_save_play_sheet_name', ''); // 存储当前播放的歌单名称
-  const [saveSheetMusic, setSaveSheetMusic, getSaveSheetMusic] = useLocalStorage('hifini_save_play_sheet_list', []); // 存储播放的歌单歌曲列表
+  const [curPlaySheet, setCurPlaySheet, getCurPlaySheet] = useLocalStorage('hifiti_save_play_sheet_name', ''); // 存储当前播放的歌单名称
+  const [saveSheetMusic, setSaveSheetMusic, getSaveSheetMusic] = useLocalStorage('hifiti_save_play_sheet_list', []); // 存储播放的歌单歌曲列表
   const [visible, setVisible] = useState(false);
   const [addSheetVisible, setAddSheetVisible] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
@@ -105,7 +105,7 @@ function App() {
   function getList() {
     const result = [];
     try {
-      result.push(...JSON.parse(localStorage.getItem('hifini_play_list')));
+      result.push(...JSON.parse(localStorage.getItem('hifiti_play_list')));
     } catch (err) {
       return result;
     }
@@ -153,12 +153,12 @@ function App() {
       type: 'success',
       content: '添加成功',
     });
-    localStorage.setItem('hifini_play_list', JSON.stringify(result));
+    localStorage.setItem('hifiti_play_list', JSON.stringify(result));
   }
 
   function setListAll(data = []) {
     setMusicList(data);
-    localStorage.setItem('hifini_play_list', JSON.stringify(data));
+    localStorage.setItem('hifiti_play_list', JSON.stringify(data));
   }
 
   // 通过判断className获取节点
@@ -173,9 +173,9 @@ function App() {
   // 插入添加到播放列表按钮
   function setInsertAddList() {
     try {
-      let ulEle = Array.from(document.querySelector('.card-body').children[0].children).filter(i => i.tagName === 'LI');
+      let ulEle = Array.from(document.querySelector('.threadlist').children).filter(i => i.tagName === 'LI');
       if (location.href.indexOf('search') !== -1) {
-        ulEle = Array.from(document.querySelector('.search .card-body').children[0].children).filter(i => i.tagName === 'LI');
+        ulEle = Array.from(document.querySelector('.threadlist').children).filter(i => i.tagName === 'LI');
       }
       ulEle.forEach(it => {
         const mediaEle = getNodeByClassName(it.children, 'media-body');
@@ -256,7 +256,8 @@ function App() {
         const ele = document.querySelector('.zs-play-list-item-operator');
         ele.parentElement.removeChild(ele);
       }
-      const ele = document.querySelector('#player4 .aplayer-music');
+      const ele = document.querySelector('#FoxSplayer .aplayer-music');
+      ele.style.overflow = 'visible';
       if (ele.innerHTML.includes('zs-play-list-item-operator')) return;
       createRoot(ele).render(
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -337,10 +338,10 @@ function App() {
   // 到达音乐播放页自动播放
   async function handleAutoPlay() {
     console.log('handleAutoPlay', _unsafeWindow);
+    const realAp = getAuditObject();
     try {
-      const realAp = getAuditObject();
       while (!realAp) {
-        console.log('window.ap4 is not available, retrying...');
+        console.log('window.ap4|ap is not available, retrying...');
         await new Promise(resolve => setTimeout(resolve, 1200));
       }
       // 插入下载、下一首、添加到播放列表按钮
@@ -555,7 +556,7 @@ function App() {
           console.log('Imported Data:', data);
           // 在这里处理导入的数据
           if (data.list) {
-            localStorage.setItem('hifini_play_list', JSON.stringify(data.list));
+            localStorage.setItem('hifiti_play_list', JSON.stringify(data.list));
           }
           if (data.sheetList) {
             setSongSheetList(data.sheetList);
@@ -586,7 +587,7 @@ function App() {
     // 创建隐藏的可下载链接
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'hifini导出.json'; // 设置文件名
+    a.download = 'hifiti导出.json'; // 设置文件名
     a.click(); // 触发点击事件
 
     // 清理
@@ -607,7 +608,7 @@ function App() {
   }
 
   useFirstUpdate(() => {
-    const ele = document.querySelector('#player4');
+    const ele = document.querySelector('#FoxSplayer');
     if (ele) {
       console.log('到达了播放页面');
       handleAutoPlay();
