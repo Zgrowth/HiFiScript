@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hifiti音乐播放管理
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
+// @version      2.0.1
 // @author       zgrowth
 // @description  在HiFiNi网站自动播放歌曲，可以自定义播放列表
 // @license      MIT
@@ -55,6 +55,104 @@
     createRoot = client.createRoot = m.createRoot;
     client.hydrateRoot = m.hydrateRoot;
   }
+  function useStateWithClosure(initialValue) {
+    const [state, setState] = require$$0.useState(initialValue);
+    const stateRef = require$$0.useRef(state);
+    require$$0.useEffect(() => {
+      stateRef.current = state;
+    }, [state]);
+    const updateState = (newState) => {
+      if (typeof newState === "function") {
+        setState((prevState) => {
+          const updatedState = newState(prevState);
+          stateRef.current = updatedState;
+          return updatedState;
+        });
+      } else {
+        setState(newState);
+        stateRef.current = newState;
+      }
+    };
+    const getState = () => {
+      return stateRef.current;
+    };
+    return [state, updateState, getState];
+  }
+  function useLocalStorage(key, initialValue) {
+    const [storedValue, setStoredValue] = require$$0.useState(() => {
+      try {
+        const item = window.localStorage.getItem(key);
+        return item ? JSON.parse(item) : initialValue;
+      } catch (error) {
+        console.error(error);
+        return initialValue;
+      }
+    });
+    const setValue = require$$0.useCallback((value) => {
+      try {
+        const valueToStore = value instanceof Function ? value(storedValue) : value;
+        setStoredValue(valueToStore);
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      } catch (error) {
+        console.error(error);
+      }
+    }, [key, storedValue]);
+    const getValue = require$$0.useCallback(() => {
+      try {
+        const item = window.localStorage.getItem(key);
+        return item ? JSON.parse(item) : initialValue;
+      } catch (error) {
+        console.error(error);
+        return initialValue;
+      }
+    }, [key, initialValue]);
+    return [storedValue, setValue, getValue];
+  }
+  function useFirstUpdate(fn, inputs) {
+    const countRef = require$$0.useRef(0);
+    require$$0.useEffect(() => {
+      if (!countRef.current) {
+        countRef.current++;
+        fn();
+      }
+    }, inputs);
+  }
+  function getList() {
+    const result = [];
+    try {
+      result.push(...JSON.parse(localStorage.getItem("hifiti_play_list")));
+    } catch (err) {
+      return result;
+    }
+    return result;
+  }
+  function exportToJsonFile(data) {
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "hifiti导出.json";
+    a.click();
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    }, 0);
+  }
+  function getNodeByClassName(node, name) {
+    for (let i = 0; i < node.length; i++) {
+      if (node[i].className.split(" ").includes(name)) {
+        return node[i];
+      }
+    }
+  }
+  function getAuditObject() {
+    try {
+      return ap4;
+    } catch (error) {
+      return ap;
+    }
+  }
   const _unsafeWindow = typeof unsafeWindow != "undefined" ? unsafeWindow : window;
   function App() {
     const [musicList, setMusicList, getMusicList] = useStateWithClosure(getList());
@@ -71,6 +169,8 @@
     const [visible, setVisible] = require$$0.useState(false);
     const [addSheetVisible, setAddSheetVisible] = require$$0.useState(false);
     const [messageApi, contextHolder] = antd.message.useMessage();
+    const [renamingIndex, setRenamingIndex] = require$$0.useState(-1);
+    const [renameValue, setRenameValue] = require$$0.useState("");
     const realSheetCurIndex = require$$0.useMemo(() => {
       let index = -1;
       const result = saveSheetMusic;
@@ -82,68 +182,6 @@
       }
       return index;
     }, [curSheetName, curPlaySheet, saveSheetMusic]);
-    function useStateWithClosure(initialValue) {
-      const [state, setState] = require$$0.useState(initialValue);
-      const stateRef = require$$0.useRef(state);
-      require$$0.useEffect(() => {
-        stateRef.current = state;
-      }, [state]);
-      const updateState = (newState) => {
-        if (typeof newState === "function") {
-          setState((prevState) => {
-            const updatedState = newState(prevState);
-            stateRef.current = updatedState;
-            return updatedState;
-          });
-        } else {
-          setState(newState);
-          stateRef.current = newState;
-        }
-      };
-      const getState = () => {
-        return stateRef.current;
-      };
-      return [state, updateState, getState];
-    }
-    function useLocalStorage(key, initialValue) {
-      const [storedValue, setStoredValue] = require$$0.useState(() => {
-        try {
-          const item = window.localStorage.getItem(key);
-          return item ? JSON.parse(item) : initialValue;
-        } catch (error) {
-          console.error(error);
-          return initialValue;
-        }
-      });
-      const setValue = require$$0.useCallback((value) => {
-        try {
-          const valueToStore = value instanceof Function ? value(storedValue) : value;
-          setStoredValue(valueToStore);
-          window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        } catch (error) {
-          console.error(error);
-        }
-      }, [key, storedValue]);
-      const getValue = require$$0.useCallback(() => {
-        try {
-          const item = window.localStorage.getItem(key);
-          return item ? JSON.parse(item) : initialValue;
-        } catch (error) {
-          console.error(error);
-          return initialValue;
-        }
-      }, [key, initialValue]);
-      return [storedValue, setValue, getValue];
-    }
-    function getList() {
-      const result = [];
-      try {
-        result.push(...JSON.parse(localStorage.getItem("hifiti_play_list")));
-      } catch (err) {
-        return result;
-      }
-      return result;
-    }
     function addSongSheet() {
       try {
         if (!sheetValue) {
@@ -187,13 +225,6 @@
       setMusicList(data);
       localStorage.setItem("hifiti_play_list", JSON.stringify(data));
     }
-    function getNodeByClassName(node, name) {
-      for (let i = 0; i < node.length; i++) {
-        if (node[i].className.split(" ").includes(name)) {
-          return node[i];
-        }
-      }
-    }
     function setInsertAddList() {
       try {
         let ulEle = Array.from(document.querySelector(".threadlist").children).filter((i) => i.tagName === "LI");
@@ -204,6 +235,10 @@
           const mediaEle = getNodeByClassName(it.children, "media-body");
           const subjectEle = getNodeByClassName(mediaEle.children, "subject");
           const title = subjectEle.children[0].innerText;
+          const curActiveTabText = document.querySelector("#nav .nav-item.active").innerText;
+          if (curActiveTabText === "互助") {
+            return;
+          }
           if (title.includes("mp3") || title.includes("MP3") || /《\s*(.*?)\s*》/g.test(title)) {
             subjectEle.setAttribute("data-href", subjectEle.children[0].href);
             subjectEle.setAttribute("data-name", title);
@@ -231,7 +266,6 @@
         });
       } catch (error) {
         console.log("插入'添加到播放列表'按钮失败:", error);
-        alert("插入'添加到播放列表'按钮失败");
       }
     }
     function handleStartPlay() {
@@ -283,14 +317,25 @@
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { dangerouslySetInnerHTML: { __html: ele.innerHTML } }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "zs-play-list-item-operator", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(
-                antd.Button,
+                antd.Popover,
                 {
-                  type: "primary",
-                  size: "small",
-                  onClick: () => {
-                    window.open(getAuditObject().audio.src, "_blank");
-                  },
-                  children: "下载"
+                  content: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px" }, children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "有的歌曲点击即可下载，有的需要二次点击" }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("img", { src: "https://cdn.jsdelivr.net/gh/Zgrowth/image@master/document/image.szdrdohfz.webp", style: { width: "200px", borderRadius: "4px" } })
+                  ] }),
+                  title: "下载说明",
+                  trigger: "hover",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    antd.Button,
+                    {
+                      type: "primary",
+                      size: "small",
+                      onClick: () => {
+                        window.open(getAuditObject().audio.src, "_blank");
+                      },
+                      children: "下载"
+                    }
+                  )
                 }
               ),
               /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -351,13 +396,6 @@
         console.log("insertOperatorBtn error:", err || err.message);
       }
     }
-    function getAuditObject() {
-      try {
-        return ap4;
-      } catch (error) {
-        return ap;
-      }
-    }
     async function handleAutoPlay() {
       console.log("handleAutoPlay", _unsafeWindow);
       const realAp = getAuditObject();
@@ -414,6 +452,84 @@
       });
       console.log("realList:", realList);
       setSongSheetList(realList);
+    }
+    function renderPlaylistItem(item, index) {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx(
+        antd.List.Item,
+        {
+          actions: [renamingIndex === index ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+            antd.Button,
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                if (!renameValue) {
+                  antd.message.error("歌曲名称不能为空");
+                  return;
+                }
+                const updatedList = musicList.map(
+                  (i, idx) => idx === index ? { ...i, name: renameValue } : i
+                );
+                setListAll(updatedList);
+                setRenamingIndex(-1);
+                setRenameValue("");
+                antd.message.success("重命名成功");
+              },
+              size: "small",
+              type: "link",
+              children: "保 存"
+            }
+          ) : /* @__PURE__ */ jsxRuntimeExports.jsx(
+            antd.Button,
+            {
+              onClick: (e) => {
+                e.stopPropagation();
+                setRenamingIndex(index);
+                setRenameValue(item.name);
+              },
+              size: "small",
+              type: "link",
+              children: "重命名"
+            }
+          ), /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: (e) => {
+            e.stopPropagation();
+            setListAll(musicList.filter((i) => i.href !== item.href));
+          }, size: "small", type: "link", danger: true, children: "删除" })],
+          styles: {
+            padding: "0px 10px"
+          },
+          onClick: () => {
+            if (renamingIndex !== index) {
+              location.href = item.href;
+              setCurPlaySheet("");
+              setSaveSheetMusic([]);
+            }
+          },
+          children: renamingIndex === index ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+            antd.Input,
+            {
+              value: renameValue,
+              onChange: (e) => setRenameValue(e.target.value),
+              onClick: (e) => e.stopPropagation(),
+              onPressEnter: (e) => {
+                e.stopPropagation();
+                if (!renameValue) {
+                  antd.message.error("歌曲名称不能为空");
+                  return;
+                }
+                const updatedList = musicList.map(
+                  (i, idx) => idx === index ? { ...i, name: renameValue } : i
+                );
+                setListAll(updatedList);
+                setRenamingIndex(-1);
+                setRenameValue("");
+                antd.message.success("重命名成功");
+              },
+              autoFocus: true,
+              style: { width: "200px" }
+            }
+          ) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: curIndex === index ? "zs-play-list-item zs-play-list-item-active" : "zs-play-list-item", children: item.name })
+        }
+      );
     }
     function renderListItem(item, index) {
       if (curSheetName) {
@@ -547,6 +663,53 @@
       setSongSheetList(realList);
       antd.message.success("添加歌曲成功");
     }
+    function jedgeHaveSongInsertBtn() {
+      try {
+        const postlistEle = document.querySelector(".postlist");
+        if (!postlistEle) return;
+        const postlistHTML = postlistEle.innerHTML;
+        const linkRegex = /https?:\/\/(?:www\.)?hifiti\.com\/thread-\d+\.htm/g;
+        let match;
+        const matches = [];
+        while ((match = linkRegex.exec(postlistHTML)) !== null) {
+          matches.push(match[0]);
+        }
+        matches.forEach((href) => {
+          const walker = document.createTreeWalker(
+            postlistEle,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+          );
+          let node;
+          while (node = walker.nextNode()) {
+            if (node.nodeValue.includes(href)) {
+              const container = document.createElement("span");
+              createRoot(container).render(
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "inline-flex", marginBottom: "4px", gap: "8px" }, children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: node.nodeValue }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    antd.Button,
+                    {
+                      type: "primary",
+                      size: "small",
+                      onClick: () => {
+                        addItemPlayList({ href, name: href });
+                      },
+                      children: "添加到播放列表"
+                    }
+                  )
+                ] })
+              );
+              node.parentNode.replaceChild(container, node);
+              break;
+            }
+          }
+        });
+      } catch (error) {
+        console.log("jedgeHaveSongInsertBtn error:", error);
+      }
+    }
     function handleExportAll() {
       exportToJsonFile({
         list: getMusicList(),
@@ -586,33 +749,18 @@
         reader.readAsText(file);
       };
     }
-    function exportToJsonFile(data) {
-      const jsonString = JSON.stringify(data, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "hifiti导出.json";
-      a.click();
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        a.remove();
-      }, 0);
-    }
-    function useFirstUpdate(fn, inputs) {
-      const countRef = require$$0.useRef(0);
-      require$$0.useEffect(() => {
-        if (!countRef.current) {
-          countRef.current++;
-          fn();
-        }
-      }, inputs);
-    }
     useFirstUpdate(() => {
       const ele = document.querySelector("#FoxSplayer");
       if (ele) {
         console.log("到达了播放页面");
         handleAutoPlay();
+      }
+    }, []);
+    useFirstUpdate(() => {
+      const text = document.querySelector("#nav .nav-item.active").innerText;
+      if (text === "互助" && document.querySelector(".postlist")) {
+        console.log("到达了互助页面，并且有回复消息，判断是否有歌曲链接需要追加添加到播放列表按钮");
+        jedgeHaveSongInsertBtn();
       }
     }, []);
     require$$0.useEffect(() => {
@@ -693,24 +841,7 @@
                   }
                 ) })
               },
-              renderItem: (item, index) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-                antd.List.Item,
-                {
-                  actions: [/* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: (e) => {
-                    e.stopPropagation();
-                    setListAll(musicList.filter((i) => i.href !== item.href));
-                  }, size: "small", type: "link", danger: true, children: "删除" })],
-                  styles: {
-                    padding: "0px 10px"
-                  },
-                  onClick: () => {
-                    location.href = item.href;
-                    setCurPlaySheet("");
-                    setSaveSheetMusic([]);
-                  },
-                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: curIndex === index ? "zs-play-list-item zs-play-list-item-active" : "zs-play-list-item", children: item.name })
-                }
-              ),
+              renderItem: renderPlaylistItem,
               header: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: "0 16px" }, children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(antd.Button, { onClick: () => {
                   setCurPlaySheet("");
