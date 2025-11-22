@@ -1,12 +1,17 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   FloatButton, Button,
   List, Modal, Empty,
   message, notification,
-  Input, Select, Dropdown,
+  Input, Select, Dropdown, Popover,
 } from 'antd';
 import './app.css';
+import { useStateWithClosure } from './hooks/useStateWithClosure';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useFirstUpdate } from './hooks/useFirstUpdate';
+import { getList, exportToJsonFile } from './utils/storage';
+import { getNodeByClassName, getAuditObject } from './utils/helpers';
 
 const _unsafeWindow = typeof unsafeWindow != "undefined" ? unsafeWindow : window;
 
@@ -25,6 +30,8 @@ function App() {
   const [visible, setVisible] = useState(false);
   const [addSheetVisible, setAddSheetVisible] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+  const [renamingIndex, setRenamingIndex] = useState(-1);
+  const [renameValue, setRenameValue] = useState('');
 
   const realSheetCurIndex = useMemo(() => {
     let index = -1;
@@ -37,80 +44,6 @@ function App() {
     }
     return index;
   }, [curSheetName, curPlaySheet, saveSheetMusic]);
-
-  function useStateWithClosure(initialValue) {
-    const [state, setState] = useState(initialValue);
-    const stateRef = useRef(state);
-
-    useEffect(() => {
-      stateRef.current = state;
-    }, [state]);
-
-    const updateState = (newState) => {
-      if (typeof newState === 'function') {
-        setState((prevState) => {
-          const updatedState = newState(prevState);
-          stateRef.current = updatedState;
-          return updatedState;
-        });
-      } else {
-        setState(newState);
-        stateRef.current = newState;
-      }
-    };
-
-    const getState = () => {
-      return stateRef.current;
-    }
-
-    return [state, updateState, getState];
-  }
-
-  function useLocalStorage(key, initialValue) {
-    const [storedValue, setStoredValue] = useState(() => {
-      try {
-        const item = window.localStorage.getItem(key);
-        return item ? JSON.parse(item) : initialValue;
-      } catch (error) {
-        console.error(error);
-        return initialValue;
-      }
-    });
-
-    // Function to set the localStorage and state
-    const setValue = useCallback((value) => {
-      try {
-        const valueToStore = value instanceof Function ? value(storedValue) : value;
-        setStoredValue(valueToStore);
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-      } catch (error) {
-        console.error(error);
-      }
-    }, [key, storedValue]);
-
-    // Function to get the current value from localStorage
-    const getValue = useCallback(() => {
-      try {
-        const item = window.localStorage.getItem(key);
-        return item ? JSON.parse(item) : initialValue;
-      } catch (error) {
-        console.error(error);
-        return initialValue;
-      }
-    }, [key, initialValue]);
-
-    return [storedValue, setValue, getValue];
-  }
-
-  function getList() {
-    const result = [];
-    try {
-      result.push(...JSON.parse(localStorage.getItem('hifiti_play_list')));
-    } catch (err) {
-      return result;
-    }
-    return result;
-  }
 
   function addSongSheet() {
     // 尝试添加歌单，如果歌单列表为空，则创建一个新的歌单并添加到歌单列表中，否则提示歌单已存在。
@@ -161,15 +94,6 @@ function App() {
     localStorage.setItem('hifiti_play_list', JSON.stringify(data));
   }
 
-  // 通过判断className获取节点
-  function getNodeByClassName(node, name) {
-    for (let i = 0; i < node.length; i++) {
-      if (node[i].className.split(' ').includes(name)) {
-        return node[i];
-      }
-    }
-  }
-
   // 插入添加到播放列表按钮
   function setInsertAddList() {
     try {
@@ -181,6 +105,10 @@ function App() {
         const mediaEle = getNodeByClassName(it.children, 'media-body');
         const subjectEle = getNodeByClassName(mediaEle.children, 'subject');
         const title = subjectEle.children[0].innerText;
+        const curActiveTabText = document.querySelector("#nav .nav-item.active").innerText;
+        if (curActiveTabText === '互助') {
+          return;
+        }
         if (title.includes('mp3') || title.includes('MP3') || /《\s*(.*?)\s*》/g.test(title)) {
           subjectEle.setAttribute('data-href', subjectEle.children[0].href);
           subjectEle.setAttribute('data-name', title);
@@ -207,7 +135,6 @@ function App() {
       })
     } catch (error) {
       console.log("插入'添加到播放列表'按钮失败:", error);
-      // alert("插入'添加到播放列表'按钮失败");
     }
   }
 
@@ -264,15 +191,26 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div dangerouslySetInnerHTML={{ __html: ele.innerHTML }} />
           <div className='zs-play-list-item-operator'>
-            <Button
-              type='primary'
-              size='small'
-              onClick={() => {
-                window.open(getAuditObject().audio.src, '_blank');
-              }}
+            <Popover
+              content={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span>有的歌曲点击即可下载，有的需要二次点击</span>
+                  <img src='https://cdn.jsdelivr.net/gh/Zgrowth/image@master/document/image.szdrdohfz.webp' style={{ width: '200px', borderRadius: '4px' }} />
+                </div>
+              }
+              title="下载说明"
+              trigger="hover"
             >
-              下载
-            </Button>
+              <Button
+                type='primary'
+                size='small'
+                onClick={() => {
+                  window.open(getAuditObject().audio.src, '_blank');
+                }}
+              >
+                下载
+              </Button>
+            </Popover>
             <Button
               style={{ marginLeft: 8 }}
               type='primary'
@@ -325,14 +263,6 @@ function App() {
       );
     } catch (err) {
       console.log('insertOperatorBtn error:', err || err.message);
-    }
-  }
-
-  function getAuditObject() {
-    try {
-      return ap4;
-    } catch (error) {
-      return ap;
     }
   }
 
@@ -398,6 +328,84 @@ function App() {
     });
     console.log('realList:', realList);
     setSongSheetList(realList);
+  }
+
+  function renderPlaylistItem(item, index) {
+    return (
+      <List.Item
+        actions={[renamingIndex === index ? <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!renameValue) {
+              message.error('歌曲名称不能为空');
+              return;
+            }
+            const updatedList = musicList.map((i, idx) => 
+              idx === index ? { ...i, name: renameValue } : i
+            );
+            setListAll(updatedList);
+            setRenamingIndex(-1);
+            setRenameValue('');
+            message.success('重命名成功');
+          }}
+          size='small'
+          type="link"
+        >
+          保 存
+        </Button> : <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            setRenamingIndex(index);
+            setRenameValue(item.name);
+          }}
+          size='small'
+          type="link"
+        >
+          重命名
+        </Button>, <Button onClick={(e) => {
+          e.stopPropagation();
+          setListAll(musicList.filter(i => i.href !== item.href));
+        }} size='small' type="link" danger>
+          删除
+        </Button>]}
+        styles={{
+          padding: '0px 10px',
+        }}
+        onClick={() => {
+          if (renamingIndex !== index) {
+            location.href = item.href;
+            setCurPlaySheet('');
+            setSaveSheetMusic([]);
+          }
+        }}
+      >
+        {renamingIndex === index ? (
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onPressEnter={(e) => {
+              e.stopPropagation();
+              if (!renameValue) {
+                message.error('歌曲名称不能为空');
+                return;
+              }
+              const updatedList = musicList.map((i, idx) => 
+                idx === index ? { ...i, name: renameValue } : i
+              );
+              setListAll(updatedList);
+              setRenamingIndex(-1);
+              setRenameValue('');
+              message.success('重命名成功');
+            }}
+            autoFocus
+            style={{ width: '200px' }}
+          />
+        ) : (
+          <span className={curIndex === index ? 'zs-play-list-item zs-play-list-item-active' : 'zs-play-list-item'}>{item.name}</span>
+        )}
+      </List.Item>
+    );
   }
 
   function renderListItem(item, index) {
@@ -525,6 +533,65 @@ function App() {
     message.success('添加歌曲成功');
   }
 
+  // 判断是否有歌曲链接需要追加添加到播放列表按钮
+  function jedgeHaveSongInsertBtn() {
+    try {
+      const postlistEle = document.querySelector('.postlist');
+      if (!postlistEle) return;
+
+      const postlistHTML = postlistEle.innerHTML;
+      // 正则匹配 hifiti.com 上的链接，例如：https://www.hifiti.com/thread-87588.htm
+      const linkRegex = /https?:\/\/(?:www\.)?hifiti\.com\/thread-\d+\.htm/g;
+
+      let match;
+      const matches = [];
+      while ((match = linkRegex.exec(postlistHTML)) !== null) {
+        matches.push(match[0]);
+      }
+
+      // 处理每个匹配到的链接
+      matches.forEach(href => {
+        // 在HTML中查找包含这个链接的文本节点
+        const walker = document.createTreeWalker(
+          postlistEle,
+          NodeFilter.SHOW_TEXT,
+          null,
+          false
+        );
+
+        let node;
+        while ((node = walker.nextNode())) {
+          if (node.nodeValue.includes(href)) {
+            // 将文本节点替换为 JSX 按钮
+            const container = document.createElement('span');
+
+            // 使用 createRoot 渲染 React 按钮替换文本节点
+            createRoot(container).render(
+              <div style={{ display: 'inline-flex', marginBottom: '4px', gap: '8px' }}>
+                <span>{node.nodeValue}</span>
+                <Button
+                  type='primary'
+                  size='small'
+                  onClick={() => {
+                    addItemPlayList({ href: href, name: href });
+                  }}
+                >
+                  添加到播放列表
+                </Button>
+              </div>
+            );
+
+            // 替换文本节点为包含按钮的容器
+            node.parentNode.replaceChild(container, node);
+            break;
+          }
+        }
+      });
+    } catch (error) {
+      console.log('jedgeHaveSongInsertBtn error:', error);
+    }
+  }
+
   // 导出
   function handleExportAll() {
     exportToJsonFile({
@@ -575,44 +642,19 @@ function App() {
     };
   }
 
-  function exportToJsonFile(data) {
-    // 序列化 JSON 数据
-    const jsonString = JSON.stringify(data, null, 2);
-
-    // 创建 Blob 对象
-    const blob = new Blob([jsonString], { type: 'application/json' });
-
-    // 创建 URL
-    const url = window.URL.createObjectURL(blob);
-
-    // 创建隐藏的可下载链接
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'hifiti导出.json'; // 设置文件名
-    a.click(); // 触发点击事件
-
-    // 清理
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url); // 释放 URL 对象
-      a.remove(); // 移除元素
-    }, 0);
-  }
-
-  function useFirstUpdate(fn, inputs) {
-    const countRef = useRef(0);
-    useEffect(() => {
-      if (!countRef.current) {
-        countRef.current++;
-        fn()
-      }
-    }, inputs);
-  }
-
   useFirstUpdate(() => {
     const ele = document.querySelector('#FoxSplayer');
     if (ele) {
       console.log('到达了播放页面');
       handleAutoPlay();
+    }
+  }, []);
+
+  useFirstUpdate(() => {
+    const text = document.querySelector("#nav .nav-item.active").innerText;
+    if (text === '互助' && document.querySelector('.postlist')) {
+      console.log('到达了互助页面，并且有回复消息，判断是否有歌曲链接需要追加添加到播放列表按钮');
+      jedgeHaveSongInsertBtn();
     }
   }, []);
 
@@ -708,26 +750,7 @@ function App() {
                   />
                 </div>
               }}
-              renderItem={(item, index) => (
-                <List.Item
-                  actions={[<Button onClick={(e) => {
-                    e.stopPropagation();
-                    setListAll(musicList.filter(i => i.href !== item.href));
-                  }} size='small' type="link" danger>
-                    删除
-                  </Button>]}
-                  styles={{
-                    padding: '0px 10px',
-                  }}
-                  onClick={() => {
-                    location.href = item.href;
-                    setCurPlaySheet('');
-                    setSaveSheetMusic([]);
-                  }}
-                >
-                  <span className={curIndex === index ? 'zs-play-list-item zs-play-list-item-active' : 'zs-play-list-item'}>{item.name}</span>
-                </List.Item>
-              )}
+              renderItem={renderPlaylistItem}
               header={<div style={{ padding: '0 16px' }}>
                 <Button onClick={() => {
                   setCurPlaySheet('');

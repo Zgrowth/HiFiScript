@@ -15,7 +15,7 @@ export default defineConfig({
         description: '在HiFiNi网站自动播放歌曲，可以自定义播放列表',
         match: ['https://www.hifiti.com/*', 'https://hifiti.com/*'],
         author: 'zgrowth',
-        version: '2.0.0',
+        version: '2.0.1',
         require: [
           'https://cdn.jsdelivr.net/npm/dayjs@1.11.11/dayjs.min.js'
         ],
